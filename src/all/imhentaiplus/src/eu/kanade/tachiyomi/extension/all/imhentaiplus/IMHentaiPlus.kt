@@ -2,10 +2,10 @@ package eu.kanade.tachiyomi.extension.all.imhentaiplus
 
 import eu.kanade.tachiyomi.multisrc.galleryadults.GalleryAdults
 import eu.kanade.tachiyomi.multisrc.galleryadults.imgAttr
-import eu.kanade.tachiyomi.source.model.MangasPage
-import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
+import eu.kanade.tachiyomi.source.model.MangasPage
+import eu.kanade.tachiyomi.source.model.SManga
 import okhttp3.OkHttpClient
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -27,17 +27,14 @@ class IMHentaiPlus(
     override val supportAdvancedSearch: Boolean = true
     override val supportSpeechless: Boolean = true
 
-    // ===== FILTER BARU =====
     class RandomCountFilter : Filter.Select<String>(
         "Random count (when Random enabled)",
-        arrayOf("1", "2", "3", "4"),
+        arrayOf("1", "3", "6", "9", "12"),
         0,
     )
 
-    // ===== OVERRIDE getFilterList =====
     override fun getFilterList(): FilterList {
         val originalFilters = super.getFilterList().list.toMutableList()
-        // Tambahkan RandomCountFilter tepat setelah RandomEntryFilter
         val randomIndex = originalFilters.indexOfFirst {
             it::class.simpleName == "RandomEntryFilter"
         }
@@ -49,7 +46,6 @@ class IMHentaiPlus(
         return FilterList(originalFilters)
     }
 
-    // ===== OVERRIDE fetchSearchManga =====
     override fun fetchSearchManga(
         page: Int,
         query: String,
@@ -57,14 +53,15 @@ class IMHentaiPlus(
     ): Observable<MangasPage> {
         val randomEntryFilter = filters.filterIsInstance<RandomEntryFilter>().firstOrNull()
         val randomCountFilter = filters.filterIsInstance<RandomCountFilter>().firstOrNull()
-        val count = (randomCountFilter?.state ?: 0) + 1 // 1, 2, 3, atau 4
+        val countMap = arrayOf(1, 3, 6, 9, 12)
+        val count = countMap[randomCountFilter?.state ?: 0]
 
         return when {
             randomEntryFilter?.state == true -> {
                 Observable.fromCallable {
                     val results = mutableListOf<SManga>()
                     repeat(count) { index ->
-                        if (index > 0) Thread.sleep(2500)
+                        if (index > 0) Thread.sleep(1000)
                         val response = client.newCall(randomEntryRequest()).execute()
                         results.addAll(randomEntryParse(response).mangas)
                     }
@@ -75,12 +72,13 @@ class IMHentaiPlus(
         }
     }
 
-    // ===== OVERRIDE LAINNYA (sama seperti IMHentai asli) =====
-    override fun Element.mangaLang() = select("a:has(.thumb_flag)").attr("href")
-        .removeSuffix("/").substringAfterLast("/")
-        .let {
-            if (it == LANGUAGE_SPEECHLESS) mangaLang else it
-        }
+    override fun Element.mangaLang() =
+        select("a:has(.thumb_flag)").attr("href")
+            .removeSuffix("/")
+            .substringAfterLast("/")
+            .let {
+                if (it == LANGUAGE_SPEECHLESS) mangaLang else it
+            }
 
     override val client: OkHttpClient = network.cloudflareClient
         .newBuilder()
@@ -91,22 +89,22 @@ class IMHentaiPlus(
                 .build()
             chain.proceed(request.newBuilder().headers(headers).build())
         }
-        .addInterceptor(
-            fun(chain): Response {
-                val response = chain.proceed(chain.request())
-                if (!response.headers("Content-Type").toString()
-                        .contains("text/html")) return response
-                val responseContentType = response.body.contentType()
-                val responseString = response.body.string()
-                if (responseString.contains("Overload... Please use the advanced search")) {
-                    response.close()
-                    throw IOException("IMHentai search is overloaded try again later")
-                }
-                return response.newBuilder()
-                    .body(responseString.toResponseBody(responseContentType))
-                    .build()
-            },
-        ).build()
+        .addInterceptor { chain ->
+            val response = chain.proceed(chain.request())
+            if (!response.headers("Content-Type").toString().contains("text/html")) {
+                return@addInterceptor response
+            }
+            val responseContentType = response.body.contentType()
+            val responseString = response.body.string()
+            if (responseString.contains("Overload... Please use the advanced search")) {
+                response.close()
+                throw IOException("IMHentai search is overloaded try again later")
+            }
+            response.newBuilder()
+                .body(responseString.toResponseBody(responseContentType))
+                .build()
+        }
+        .build()
 
     override fun Element.getInfo(tag: String): String =
         select("li:has(.tags_text:contains($tag:)) a.tag")
@@ -114,7 +112,8 @@ class IMHentaiPlus(
                 val name = it.ownText()
                 if (tag.contains(regexTag)) {
                     genres[name] = it.attr("href")
-                        .removeSuffix("/").substringAfterLast('/')
+                        .removeSuffix("/")
+                        .substringAfterLast('/')
                 }
                 listOf(
                     name,
@@ -127,7 +126,10 @@ class IMHentaiPlus(
             }
 
     override fun Element.getCover() = selectFirst(".left_cover img")?.imgAttr()
+
     override val mangaDetailInfoSelector = ".gallery_first"
+
     override val thumbnailSelector = ".gthumb"
+
     override val pageUri = "view"
 }
