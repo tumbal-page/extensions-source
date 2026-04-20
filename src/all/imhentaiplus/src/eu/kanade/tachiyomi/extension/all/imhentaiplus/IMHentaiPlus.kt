@@ -26,11 +26,12 @@ class IMHentaiPlus(
     override val supportAdvancedSearch: Boolean = true
     override val supportSpeechless: Boolean = true
 
-    class RandomCountFilter : Filter.Select<String>(
-        "Random count (when Random enabled)",
-        arrayOf("1", "3", "6", "9", "12"),
-        0,
-    )
+    class RandomCountFilter :
+        Filter.Select<String>(
+            "Random count (when Random enabled)",
+            arrayOf("1", "3", "6", "9", "12"),
+            0,
+        )
 
     override fun getFilterList(): FilterList {
         val originalFilters = super.getFilterList().list.toMutableList()
@@ -105,24 +106,23 @@ class IMHentaiPlus(
         }
         .build()
 
-    override fun Element.getInfo(tag: String): String =
-        select("li:has(.tags_text:contains($tag:)) a.tag")
-            .joinToString {
-                val name = it.ownText()
-                if (tag.contains(regexTag)) {
-                    genres[name] = it.attr("href")
-                        .removeSuffix("/")
-                        .substringAfterLast('/')
-                }
-                listOf(
-                    name,
-                    it.select(".split_tag").text()
-                        .trim()
-                        .removePrefix("| "),
-                )
-                    .filter { s -> s.isNotBlank() }
-                    .joinToString()
+    override fun Element.getInfo(tag: String): String = select("li:has(.tags_text:contains($tag:)) a.tag")
+        .joinToString {
+            val name = it.ownText()
+            if (tag.contains(regexTag)) {
+                genres[name] = it.attr("href")
+                    .removeSuffix("/")
+                    .substringAfterLast('/')
             }
+            listOf(
+                name,
+                it.select(".split_tag").text()
+                    .trim()
+                    .removePrefix("| "),
+            )
+                .filter { s -> s.isNotBlank() }
+                .joinToString()
+        }
 
     override fun Element.getCover() = selectFirst(".left_cover img")?.imgAttr()
 
