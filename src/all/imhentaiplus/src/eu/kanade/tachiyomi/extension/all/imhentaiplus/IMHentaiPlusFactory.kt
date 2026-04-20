@@ -1,9 +1,10 @@
 package eu.kanade.tachiyomi.extension.all.imhentaiplus
 
+import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceFactory
 
 class IMHentaiPlusFactory : SourceFactory {
-    override fun createSources() = listOf(
+    override fun createSources(): List<Source> = listOf(
         IMHentaiPlus(),
         IMHentaiPlus("en", "english"),
         IMHentaiPlus("ja", "japanese"),
