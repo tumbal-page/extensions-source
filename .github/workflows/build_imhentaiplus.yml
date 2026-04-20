@@ -17,7 +17,7 @@ jobs:
           distribution: temurin
 
       - name: Build IMHentaiPlus APK
-        run: ./gradlew :all-imhentaiplus:assembleRelease
+        run: ./gradlew projects 2>&1 | grep -i "imhentai"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
