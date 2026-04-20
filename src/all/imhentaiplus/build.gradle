@@ -3,7 +3,8 @@ ext {
     extClass = '.IMHentaiPlusFactory'
     extVersionCode = 1
     isNsfw = true
-    libVersion = '1.4'
+    themeName = 'GalleryAdults'
+    themeClass = '.GalleryAdults'
 }
 
 apply from: "$rootDir/common.gradle"
