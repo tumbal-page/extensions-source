@@ -1,0 +1,26 @@
+name: Build IMHentaiPlus
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: 17
+          distribution: temurin
+
+      - name: Build IMHentaiPlus APK
+        run: ./gradlew :extensions:all:imhentaiplus:assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: IMHentaiPlus
+          path: src/all/imhentaiplus/build/outputs/apk/release/*.apk
