@@ -72,13 +72,12 @@ class IMHentaiPlus(
         }
     }
 
-    override fun Element.mangaLang() =
-        select("a:has(.thumb_flag)").attr("href")
-            .removeSuffix("/")
-            .substringAfterLast("/")
-            .let {
-                if (it == LANGUAGE_SPEECHLESS) mangaLang else it
-            }
+    override fun Element.mangaLang() = select("a:has(.thumb_flag)").attr("href")
+        .removeSuffix("/")
+        .substringAfterLast("/")
+        .let {
+            if (it == LANGUAGE_SPEECHLESS) mangaLang else it
+        }
 
     override val client: OkHttpClient = network.cloudflareClient
         .newBuilder()
