@@ -1,0 +1,26 @@
+name: Generate Signing Key
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate keystore
+        run: |
+          keytool -genkey -v \
+            -keystore signingkey.jks \
+            -alias mykey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass password123 \
+            -keypass password123 \
+            -dname "CN=IMHentaiPlus, O=Android, C=US"
+
+      - name: Convert to base64
+        run: base64 -w 0 signingkey.jks > signingkey_base64.txt
+
+      - name: Print base64
+        run: cat signingkey_base64.txt
