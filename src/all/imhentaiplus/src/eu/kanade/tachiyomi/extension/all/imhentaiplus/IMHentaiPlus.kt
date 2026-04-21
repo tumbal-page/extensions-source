@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.extension.all.imhentaiplus
 
 import eu.kanade.tachiyomi.multisrc.galleryadults.GalleryAdults
+import eu.kanade.tachiyomi.multisrc.galleryadults.RandomEntryFilter
 import eu.kanade.tachiyomi.multisrc.galleryadults.imgAttr
 import eu.kanade.tachiyomi.source.model.Filter
 import eu.kanade.tachiyomi.source.model.FilterList
@@ -51,8 +52,8 @@ class IMHentaiPlus(
         query: String,
         filters: FilterList,
     ): Observable<MangasPage> {
-        val randomEntryFilter = filters.filterIsInstance<RandomEntryFilter>().firstOrNull()
-        val randomCountFilter = filters.filterIsInstance<RandomCountFilter>().firstOrNull()
+        val randomEntryFilter = filters.list.filterIsInstance<RandomEntryFilter>().firstOrNull()
+        val randomCountFilter = filters.list.filterIsInstance<RandomCountFilter>().firstOrNull()
         val countMap = arrayOf(1, 3, 6, 9, 12)
         val count = countMap[randomCountFilter?.state ?: 0]
 
