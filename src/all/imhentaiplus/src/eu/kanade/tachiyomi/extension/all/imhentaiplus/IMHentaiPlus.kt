@@ -34,6 +34,11 @@ class IMHentaiPlus(
             0,
         )
 
+    class RandomDelayFilter :
+        Filter.Text(
+            "Random delay in ms (default: 1000)",
+        )
+
     override fun getFilterList(): FilterList {
         val originalFilters = super.getFilterList().list.toMutableList()
         val randomIndex = originalFilters.indexOfFirst {
@@ -41,8 +46,10 @@ class IMHentaiPlus(
         }
         if (randomIndex >= 0) {
             originalFilters.add(randomIndex + 1, RandomCountFilter())
+            originalFilters.add(randomIndex + 2, RandomDelayFilter())
         } else {
             originalFilters.add(RandomCountFilter())
+            originalFilters.add(RandomDelayFilter())
         }
         return FilterList(originalFilters)
     }
@@ -54,15 +61,17 @@ class IMHentaiPlus(
     ): Observable<MangasPage> {
         val randomEntryFilter = filters.list.filterIsInstance<RandomEntryFilter>().firstOrNull()
         val randomCountFilter = filters.list.filterIsInstance<RandomCountFilter>().firstOrNull()
+        val randomDelayFilter = filters.list.filterIsInstance<RandomDelayFilter>().firstOrNull()
         val countMap = arrayOf(1, 3, 6, 9, 12)
         val count = countMap[randomCountFilter?.state ?: 0]
+        val delay = randomDelayFilter?.state?.toLongOrNull()?.coerceAtLeast(0L) ?: 1000L
 
         return when {
             randomEntryFilter?.state == true -> {
                 Observable.fromCallable {
                     val results = mutableListOf<SManga>()
                     repeat(count) { index ->
-                        if (index > 0) Thread.sleep(1000)
+                        if (index > 0) Thread.sleep(delay)
                         val response = client.newCall(randomEntryRequest()).execute()
                         results.addAll(randomEntryParse(response).mangas)
                     }
