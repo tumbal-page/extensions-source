@@ -72,13 +72,19 @@ class IMHentaiPlus(
         return when {
             randomEntryFilter?.state == true -> {
                 Observable.fromCallable {
-                    val results = mutableListOf<SManga>()
-                    repeat(count) { index ->
-                        if (index > 0) Thread.sleep(delay)
-                        val response = client.newCall(randomEntryRequest()).execute()
-                        results.addAll(randomEntryParse(response).mangas)
+                    val results = (0 until count).map {
+                        Observable.fromCallable {
+                            Thread.sleep(delay)
+                            val response = client.newCall(randomEntryRequest()).execute()
+                            randomEntryParse(response).mangas
+                        }.subscribeOn(Schedulers.io())
                     }
-                    MangasPage(results, false)
+                    Observable.merge(results)
+                        .toList()
+                        .toBlocking()
+                        .first()
+                        .flatten()
+                        .let { MangasPage(it, false) }
                 }.subscribeOn(Schedulers.io())
             }
             else -> super.fetchSearchManga(page, query, filters)
