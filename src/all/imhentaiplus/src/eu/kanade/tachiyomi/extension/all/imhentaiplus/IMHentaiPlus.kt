@@ -29,7 +29,7 @@ class IMHentaiPlus(
     class RandomCountFilter :
         Filter.Select<String>(
             "Random count (when Random enabled)",
-            arrayOf("1", "3", "6", "9", "12"),
+            arrayOf("1", "3", "6", "9", "12", "Unlimited"),
             0,
         )
 
@@ -63,9 +63,11 @@ class IMHentaiPlus(
         val randomEntryFilter = filters.list.filterIsInstance<RandomEntryFilter>().firstOrNull()
         val randomCountFilter = filters.list.filterIsInstance<RandomCountFilter>().firstOrNull()
         val randomDelayFilter = filters.list.filterIsInstance<RandomDelayFilter>().firstOrNull()
-        val countMap = arrayOf(1, 3, 6, 9, 12)
+        val countMap = arrayOf(1, 3, 6, 9, 12, -1)
         val delayMap = arrayOf(100L, 500L, 1000L)
-        val count = countMap[randomCountFilter?.state ?: 0]
+        val countIndex = randomCountFilter?.state ?: 0
+        val isUnlimited = countIndex == 5
+        val count = if (isUnlimited) if (page == 1) 12 else 6 else countMap[countIndex]
         val delay = delayMap[randomDelayFilter?.state ?: 2]
 
         return when {
@@ -83,7 +85,7 @@ class IMHentaiPlus(
                         .toBlocking()
                         .first()
                         .flatten()
-                        .let { MangasPage(it, false) }
+                        .let { MangasPage(it, isUnlimited) }
                 }.subscribeOn(Schedulers.io())
             }
             else -> super.fetchSearchManga(page, query, filters)
