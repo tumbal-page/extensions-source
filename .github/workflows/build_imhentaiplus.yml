@@ -16,7 +16,23 @@ jobs:
           java-version: 17
           distribution: temurin
 
+      - name: Prepare signing key
+        run: |
+          keytool -genkey -v \
+            -keystore signingkey.jks \
+            -alias mykey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass password123 \
+            -keypass password123 \
+            -dname "CN=IMHentaiPlus, O=Android, C=US"
+
       - name: Build IMHentaiPlus APK
+        env:
+          ALIAS: mykey
+          KEY_STORE_PASSWORD: password123
+          KEY_PASSWORD: password123
         run: ./gradlew :src:all:imhentaiplus:assembleRelease
 
       - name: Upload APK
