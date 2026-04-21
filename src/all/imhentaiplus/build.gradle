@@ -3,6 +3,8 @@ ext {
     extClass = '.IMHentaiPlusFactory'
     extVersionCode = 1
     isNsfw = true
+    sourceHost = 'imhentai.xxx'
+    sourceScheme = 'https'
 }
 
 apply from: "$rootDir/common.gradle"
