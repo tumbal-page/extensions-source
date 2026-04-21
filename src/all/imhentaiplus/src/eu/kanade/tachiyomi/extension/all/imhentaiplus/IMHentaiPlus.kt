@@ -35,8 +35,10 @@ class IMHentaiPlus(
         )
 
     class RandomDelayFilter :
-        Filter.Text(
-            "Random delay in ms (default: 1000)",
+        Filter.Select<String>(
+            "Random delay in ms (when Random enabled)",
+            arrayOf("100", "500", "1000"),
+            2,
         )
 
     override fun getFilterList(): FilterList {
@@ -63,8 +65,9 @@ class IMHentaiPlus(
         val randomCountFilter = filters.list.filterIsInstance<RandomCountFilter>().firstOrNull()
         val randomDelayFilter = filters.list.filterIsInstance<RandomDelayFilter>().firstOrNull()
         val countMap = arrayOf(1, 3, 6, 9, 12)
+        val delayMap = arrayOf(100L, 500L, 1000L)
         val count = countMap[randomCountFilter?.state ?: 0]
-        val delay = randomDelayFilter?.state?.toLongOrNull()?.coerceAtLeast(0L) ?: 1000L
+        val delay = delayMap[randomDelayFilter?.state ?: 2]
 
         return when {
             randomEntryFilter?.state == true -> {
