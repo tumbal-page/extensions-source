@@ -3,8 +3,10 @@ ext {
     extClass = '.IMHentaiPlusFactory'
     extVersionCode = 1
     isNsfw = true
-    themeName = 'GalleryAdults'
-    themeClass = '.GalleryAdults'
 }
 
 apply from: "$rootDir/common.gradle"
+
+dependencies {
+    implementation(project(":lib-multisrc:galleryadults"))
+}
