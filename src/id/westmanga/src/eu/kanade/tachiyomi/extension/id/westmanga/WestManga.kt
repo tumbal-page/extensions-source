@@ -18,8 +18,8 @@ import javax.crypto.spec.SecretKeySpec
 
 class WestManga : HttpSource() {
     override val name = "West Manga"
-    override val baseUrl = "https://westmanga.me"
-    private val apiUrl = "https://data.westmanga.me"
+    override val baseUrl = "https://westmanga.co"
+    private val apiUrl = "https://data.westmanga.co"
     override val lang = "id"
     override val id = 8883916630998758688
     override val supportsLatest = true
@@ -68,7 +68,6 @@ class WestManga : HttpSource() {
 
         val entries = data.data.map {
             SManga.create().apply {
-                // old urls compatibility
                 setUrlWithoutDomain(
                     baseUrl.toHttpUrl().newBuilder()
                         .addPathSegment("manga")
@@ -112,7 +111,6 @@ class WestManga : HttpSource() {
         val data = response.parseAs<Data<Manga>>().data
 
         return SManga.create().apply {
-            // old urls compatibility
             setUrlWithoutDomain(
                 baseUrl.toHttpUrl().newBuilder()
                     .addPathSegment("manga")
@@ -142,9 +140,7 @@ class WestManga : HttpSource() {
             }.joinToString()
             description = buildString {
                 data.synopsis?.let {
-                    append(
-                        Jsoup.parseBodyFragment(it).wholeText().trim(),
-                    )
+                    append(Jsoup.parseBodyFragment(it).wholeText().trim())
                 }
                 data.alternativeName?.let {
                     append("\n\n")
@@ -199,10 +195,7 @@ class WestManga : HttpSource() {
 
     override fun pageListParse(response: Response): List<Page> {
         val data = response.parseAs<Data<ImageList>>().data
-
-        return data.images.mapIndexed { idx, img ->
-            Page(idx, imageUrl = img)
-        }
+        return data.images.mapIndexed { idx, img -> Page(idx, imageUrl = img) }
     }
 
     private fun apiRequest(url: HttpUrl): Request {
