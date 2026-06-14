@@ -18,8 +18,8 @@ import javax.crypto.spec.SecretKeySpec
 
 class WestManga : HttpSource() {
     override val name = "West Manga"
-    override val baseUrl = "https://westmanga.co"
-    private val apiUrl = "https://data.westmanga.co"
+    override val baseUrl = "https://westmanga.cc"
+    private val apiUrl = "https://data.westmanga.cc"
     override val lang = "id"
     override val id = 8883916630998758688
     override val supportsLatest = true
