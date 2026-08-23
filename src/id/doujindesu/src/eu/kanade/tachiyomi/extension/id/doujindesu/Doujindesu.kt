@@ -135,12 +135,12 @@ abstract class Doujindesu : HttpSource() {
                     val selected = filter.state.filter { it.state }
                     if (selected.isNotEmpty()) {
                         val slugs = selected.map { it.id.lowercase().replace(" ", "-") }
-                        if (slugs.size == 1) {
-                            // Single genre: send directly, no AND logic needed
-                            builder.addEncodedQueryParameter("genre", slugs.first())
+                        val useAnd = filters.firstInstanceOrNull<GenreAndFilter>()?.state == true
+                        if (!useAnd || slugs.size == 1) {
+                            // OR mode atau hanya 1 genre: kirim semua ke server
+                            builder.addEncodedQueryParameter("genre", slugs.joinToString(","))
                         } else {
-                            // Multi-genre AND: find smallest genre count to use as server filter,
-                            // store full list in _genre_and_ for client-side AND in searchMangaParse.
+                            // AND mode: kirim genre tersedikit ke server, simpan semua di _genre_and_
                             // ponytail: N count requests upfront; ceiling = N extra round-trips per search page.
                             // Upgrade path: server-side AND param if API ever supports it.
                             val primary = slugs.minByOrNull { slug ->
@@ -238,6 +238,7 @@ abstract class Doujindesu : HttpSource() {
         StatusList(statusList),
         CategoryNames(categoryNames),
         OrderBy(orderBy),
+        GenreAndFilter(),
         GenreList(getGenreList()),
     )
 
