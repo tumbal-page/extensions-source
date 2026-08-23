@@ -151,14 +151,12 @@ abstract class Doujindesu : HttpSource() {
     /**
      * Mengambil genre yang dikirim pada request (genre=yuri,maid -> ["yuri", "maid"]).
      */
-    private fun selectedGenresFromRequest(response: Response): Set<String> {
-        return response.request.url.queryParameter("genre")
-            ?.split(",")
-            ?.map { it.trim().lowercase() }
-            ?.filter { it.isNotBlank() }
-            ?.toSet()
-            ?: emptySet()
-    }
+    private fun selectedGenresFromRequest(response: Response): Set<String> = response.request.url.queryParameter("genre")
+        ?.split(",")
+        ?.map { it.trim().lowercase() }
+        ?.filter { it.isNotBlank() }
+        ?.toSet()
+        ?: emptySet()
 
     /**
      * Mengambil value property dari object menggunakan getter, supaya tidak bergantung
