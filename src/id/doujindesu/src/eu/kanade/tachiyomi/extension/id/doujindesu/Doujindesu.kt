@@ -144,34 +144,6 @@ abstract class Doujindesu : HttpSource() {
         return GET(builder.build(), headers)
     }
 
-    // ============================================================
-    // CLIENT-SIDE AND FILTER
-    // ============================================================
-
-    /**
-     * Mengambil genre yang dikirim pada request (genre=yuri,maid -> ["yuri", "maid"]).
-     */
-    private fun selectedGenresFromRequest(response: Response): Set<String> = response.request.url.queryParameter("genre")
-        ?.split(",")
-        ?.map { it.trim().lowercase() }
-        ?.filter { it.isNotBlank() }
-        ?.toSet()
-        ?: emptySet()
-
-    /**
-     * Server melakukan OR ketika genre dikirim (genre=yuri,maid).
-     * Di sini kita ubah hasilnya menjadi AND: manga harus memiliki SEMUA genre yang dipilih.
-     * Genre slug manga diambil dari MangaItem.genreSlugs() (parsing termList).
-     */
-    private fun filterMangasByGenres(mangas: List<MangaItem>, selectedGenres: Set<String>): List<MangaItem> {
-        if (selectedGenres.isEmpty()) return mangas
-
-        return mangas.filter { manga ->
-            val mangaGenres = manga.genreSlugs()
-            selectedGenres.all { it in mangaGenres }
-        }
-    }
-
     override fun searchMangaParse(response: Response): MangasPage {
         val url = response.request.url
 
@@ -180,21 +152,32 @@ abstract class Doujindesu : HttpSource() {
         val mangas = if (url.pathSegments.contains("manga")) {
             val total = response.headers["x-total-count"]?.toIntOrNull()
             val currentPage = url.fragment?.toIntOrNull() ?: 1
-
-            val rawMangas = response.parseAs<List<MangaItem>>()
-            val selectedGenres = selectedGenresFromRequest(response)
-            val filteredMangas = filterMangasByGenres(rawMangas, selectedGenres)
-
-            // Pagination masih menggunakan total dari server.
             hasNextPage = total?.let { currentPage * LIMIT < it } ?: true
-
-            filteredMangas
+            response.parseAs<List<MangaItem>>()
         } else {
             val taxonomyDto = response.parseAs<TaxonomyMangas>()
             hasNextPage = taxonomyDto.pagination.page < taxonomyDto.pagination.totalPages
             taxonomyDto.mangaList
         }
-        return MangasPage(mangas.map { it.toSManga(baseUrl) }, hasNextPage)
+
+        // ponytail: client-side AND filter; server returns OR for comma-separated genres.
+        // Only activates when >1 genre selected; single genre passes through unchanged.
+        val selectedGenres = url.queryParameter("genre")
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            ?.takeIf { it.size > 1 }
+
+        val filtered = if (selectedGenres != null) {
+            mangas.filter { manga ->
+                val slugs = manga.mangaGenres.map { it.genres.slug }.toSet()
+                selectedGenres.all { it in slugs }
+            }
+        } else {
+            mangas
+        }
+
+        return MangasPage(filtered.map { it.toSManga(baseUrl) }, hasNextPage)
     }
 
     override fun getMangaUrl(manga: SManga) = "$baseUrl/manga/${manga.getSlug()}"
