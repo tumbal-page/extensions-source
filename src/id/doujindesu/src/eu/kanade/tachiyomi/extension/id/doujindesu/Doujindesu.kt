@@ -134,7 +134,27 @@ abstract class Doujindesu : HttpSource() {
                 is GenreList -> {
                     val selected = filter.state.filter { it.state }
                     if (selected.isNotEmpty()) {
-                        builder.addEncodedQueryParameter("genre", selected.joinToString(",") { it.id.lowercase().replace(" ", "-") })
+                        val slugs = selected.map { it.id.lowercase().replace(" ", "-") }
+                        if (slugs.size == 1) {
+                            // Single genre: send directly, no AND logic needed
+                            builder.addEncodedQueryParameter("genre", slugs.first())
+                        } else {
+                            // Multi-genre AND: find smallest genre count to use as server filter,
+                            // store full list in _genre_and_ for client-side AND in searchMangaParse.
+                            // ponytail: N count requests upfront; ceiling = N extra round-trips per search page.
+                            // Upgrade path: server-side AND param if API ever supports it.
+                            val primary = slugs.minByOrNull { slug ->
+                                val countUrl = "$apiUrl/manga".toHttpUrl().newBuilder()
+                                    .addQueryParameter("limit", "1")
+                                    .addQueryParameter("offset", "0")
+                                    .addQueryParameter("genre", slug)
+                                    .build()
+                                client.newCall(GET(countUrl, headers)).execute()
+                                    .headers["x-total-count"]?.toIntOrNull() ?: Int.MAX_VALUE
+                            } ?: slugs.first()
+                            builder.addEncodedQueryParameter("genre", primary)
+                            builder.addEncodedQueryParameter("_genre_and_", slugs.joinToString(","))
+                        }
                     }
                 }
                 else -> {}
@@ -160,9 +180,9 @@ abstract class Doujindesu : HttpSource() {
             taxonomyDto.mangaList
         }
 
-        // ponytail: client-side AND filter; server returns OR for comma-separated genres.
+        // ponytail: client-side AND filter; server returns results for the smallest-count genre only.
         // Only activates when >1 genre selected; single genre passes through unchanged.
-        val selectedGenres = url.queryParameter("genre")
+        val selectedGenres = url.queryParameter("_genre_and_")
             ?.split(",")
             ?.map { it.trim() }
             ?.filter { it.isNotBlank() }
