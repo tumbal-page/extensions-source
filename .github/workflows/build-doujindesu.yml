@@ -1,0 +1,41 @@
+name: Build Doujindesu Extension
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/id/doujindesu/**'
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build Doujindesu APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: temurin
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Debug build: tidak butuh signing key sama sekali,
+      # cocok buat testing/pemakaian pribadi.
+      - name: Build Doujindesu (debug)
+        run: ./gradlew :src:id:doujindesu:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: doujindesu-debug-apk
+          path: src/id/doujindesu/build/outputs/apk/debug/*.apk
+          retention-days: 7
