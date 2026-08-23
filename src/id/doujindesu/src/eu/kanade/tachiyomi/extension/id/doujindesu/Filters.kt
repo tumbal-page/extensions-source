@@ -29,6 +29,7 @@ class CategoryNames(categories: Array<Category>) : Filter.Select<Category>("Kate
 class OrderBy(orders: Array<Order>) : Filter.Select<Order>("Urutkan", orders, 0)
 class GenreList(genres: List<Genre>) : Filter.Group<Genre>("Genre", genres)
 class StatusList(statuses: Array<Status>) : Filter.Select<Status>("Status", statuses, 0)
+class GenreAndFilter : Filter.CheckBox("Gabungkan Genre?", false)
 
 val orderBy = arrayOf(
     Order("Semua", ""),
