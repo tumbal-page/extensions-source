@@ -151,56 +151,25 @@ abstract class Doujindesu : HttpSource() {
     /**
      * Mengambil genre yang dikirim pada request (genre=yuri,maid -> ["yuri", "maid"]).
      */
-    private fun selectedGenresFromRequest(response: Response): Set<String> = response.request.url.queryParameter("genre")
-        ?.split(",")
-        ?.map { it.trim().lowercase() }
-        ?.filter { it.isNotBlank() }
-        ?.toSet()
-        ?: emptySet()
-
-    /**
-     * Mengambil value property dari object menggunakan getter, supaya tidak bergantung
-     * pada nama property Kotlin tertentu di MangaItem.
-     */
-    private fun getProperty(instance: Any?, propertyName: String): Any? {
-        if (instance == null) return null
-        val expectedGetter = "get" + propertyName.replaceFirstChar { it.uppercase() }
-        val method = instance.javaClass.methods.firstOrNull {
-            it.name == expectedGetter && it.parameterTypes.isEmpty()
-        }
-        return try {
-            method?.invoke(instance)
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    /**
-     * Mengambil slug genre dari sebuah MangaItem (manga_genres -> genres -> slug).
-     */
-    private fun mangaGenreSlugs(manga: MangaItem): Set<String> {
-        val mangaGenres = getProperty(manga, "mangaGenres")
-        if (mangaGenres !is Iterable<*>) return emptySet()
-
-        return buildSet {
-            mangaGenres.forEach { mangaGenre ->
-                if (mangaGenre == null) return@forEach
-                val genre = getProperty(mangaGenre, "genres")
-                val slug = getProperty(genre, "slug")?.toString()?.trim()?.lowercase()
-                if (!slug.isNullOrBlank()) add(slug)
-            }
-        }
+    private fun selectedGenresFromRequest(response: Response): Set<String> {
+        return response.request.url.queryParameter("genre")
+            ?.split(",")
+            ?.map { it.trim().lowercase() }
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?: emptySet()
     }
 
     /**
      * Server melakukan OR ketika genre dikirim (genre=yuri,maid).
      * Di sini kita ubah hasilnya menjadi AND: manga harus memiliki SEMUA genre yang dipilih.
+     * Genre slug manga diambil dari MangaItem.genreSlugs() (parsing termList).
      */
     private fun filterMangasByGenres(mangas: List<MangaItem>, selectedGenres: Set<String>): List<MangaItem> {
         if (selectedGenres.isEmpty()) return mangas
 
         return mangas.filter { manga ->
-            val mangaGenres = mangaGenreSlugs(manga)
+            val mangaGenres = manga.genreSlugs()
             selectedGenres.all { it in mangaGenres }
         }
     }
