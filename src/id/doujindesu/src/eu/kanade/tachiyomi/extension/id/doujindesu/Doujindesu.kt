@@ -24,18 +24,12 @@ import java.util.LinkedHashMap
 abstract class Doujindesu : HttpSource() {
 
     override val supportsLatest = true
+    private val apiUrl: String get() = "$baseUrl/api"
 
-    private val apiUrl: String
-        get() = "$baseUrl/api"
-
-    private val decryptor by lazy {
-        Decryptor(apiUrl)
-    }
+    private val decryptor by lazy { Decryptor(apiUrl) }
 
     private val slugCache = object : LinkedHashMap<String, String>() {
-        override fun removeEldestEntry(
-            eldest: MutableMap.MutableEntry<String, String>?,
-        ) = size > 30
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?) = size > 30
     }
 
     override val client: OkHttpClient by lazy {
@@ -50,11 +44,7 @@ abstract class Doujindesu : HttpSource() {
                     headers.removeAll("x-app-secret")
                 }
 
-                chain.proceed(
-                    request.newBuilder()
-                        .headers(headers.build())
-                        .build(),
-                )
+                chain.proceed(request.newBuilder().headers(headers.build()).build())
             }
             .build()
     }
@@ -71,211 +61,87 @@ abstract class Doujindesu : HttpSource() {
 
     override fun latestUpdatesParse(response: Response): MangasPage = searchMangaParse(response)
 
-    private fun searchRequest(
-        page: Int,
-        sort: String = "latest_chapter",
-    ): Request {
+    private fun searchRequest(page: Int, sort: String = "latest_chapter"): Request {
         val offset = (page - 1) * LIMIT
-
-        val url = "$apiUrl/manga"
-            .toHttpUrl()
-            .newBuilder()
+        val url = "$apiUrl/manga".toHttpUrl().newBuilder()
             .addQueryParameter("limit", LIMIT.toString())
             .addQueryParameter("offset", offset.toString())
             .addQueryParameter("sort", sort)
-            .fragment(page.toString())
+            .fragment(page.toString()) // for parse to know end of pagination
             .build()
-
         return GET(url, headers)
     }
 
-    override fun searchMangaRequest(
-        page: Int,
-        query: String,
-        filters: FilterList,
-    ): Request {
-        // Priority when query exists:
-        // usual filter > type filter, otherwise opposite
+    override fun searchMangaRequest(page: Int, query: String, filters: FilterList): Request {
+        // priority when query exists: usual filter > type filter, otherwise opposite
         val hasQuery = query.isNotBlank()
+        val agsFilter = filters.firstInstanceOrNull<AuthorGroupSeriesFilter>()
+        val agsValueFilter = filters.firstInstanceOrNull<AuthorGroupSeriesValueFilter>()
+        val agsValue = agsValueFilter?.state?.trim()
 
-        val agsFilter =
-            filters.firstInstanceOrNull<AuthorGroupSeriesFilter>()
-
-        val agsValueFilter =
-            filters.firstInstanceOrNull<AuthorGroupSeriesValueFilter>()
-
-        val agsValue =
-            agsValueFilter?.state?.trim()
-
-        if (
-            !hasQuery &&
-            agsFilter != null &&
-            agsFilter.state in agsFilter.values.indices
-        ) {
-            val selected =
-                agsFilter.values[agsFilter.state]
-
+        if (!hasQuery && agsFilter != null && agsFilter.state in agsFilter.values.indices) {
+            val selected = agsFilter.values[agsFilter.state]
             val type = selected.key
-
             val cacheKey = "$type:$agsValue"
 
-            if (
-                type.isNotBlank() &&
-                !agsValue.isNullOrBlank()
-            ) {
-                val slug =
-                    slugCache[cacheKey] ?: run {
-                        val url =
-                            "$apiUrl/taxonomy/$type/"
-                                .toHttpUrl()
-                                .newBuilder()
-                                .addQueryParameter(
-                                    "search",
-                                    agsValue,
-                                )
-                                .addQueryParameter(
-                                    "limit",
-                                    "1",
-                                )
-                                .build()
-
-                        val termRes =
-                            client.newCall(
-                                GET(url, headers),
-                            ).execute()
-
-                        termRes
-                            .parseAs<TermsResult>()
-                            .terms
-                            .firstOrNull()
-                            ?.slug
-                            ?: throw IOException(
-                                "Gagal menemukan: $agsValue",
-                            )
-                    }.also {
-                        slugCache[cacheKey] = it
-                    }
-
-                val url2 =
-                    "$apiUrl/taxonomy/$type/$slug"
-                        .toHttpUrl()
-                        .newBuilder()
-                        .addQueryParameter(
-                            "limit",
-                            LIMIT.toString(),
-                        )
-                        .addQueryParameter(
-                            "page",
-                            page.toString(),
-                        )
+            if (type.isNotBlank() && !agsValue.isNullOrBlank()) {
+                // Search the input and pick a slug if not cached
+                val slug = slugCache[cacheKey] ?: run {
+                    val url = "$apiUrl/taxonomy/$type/".toHttpUrl().newBuilder()
+                        .addQueryParameter("search", agsValue)
+                        .addQueryParameter("limit", "1")
                         .build()
+                    val termRes = client.newCall(GET(url, headers)).execute()
+                    termRes.parseAs<TermsResult>().terms.firstOrNull()?.slug
+                        ?: throw IOException("Gagal menemukan: $agsValue")
+                }.also { slugCache[cacheKey] = it }
 
+                val url2 = "$apiUrl/taxonomy/$type/$slug".toHttpUrl().newBuilder()
+                    .addQueryParameter("limit", LIMIT.toString())
+                    .addQueryParameter("page", page.toString())
+                    .build()
                 return GET(url2, headers)
-            } else if (
-                type.isBlank() &&
-                !agsValue.isNullOrBlank()
-            ) {
-                throw IOException(
-                    "Pilih tipe filter",
-                )
+            } else if (type.isBlank() && !agsValue.isNullOrBlank()) {
+                throw IOException("Pilih tipe filter")
             }
         }
 
         // Usual query search + other filters
-        val builder =
-            searchRequest(page)
-                .url
-                .newBuilder()
+        val builder = searchRequest(page).url.newBuilder()
 
-        if (hasQuery) {
-            builder.addQueryParameter(
-                "search",
-                query,
-            )
-        }
+        if (hasQuery) builder.addQueryParameter("search", query)
 
         filters.forEach { filter ->
             when (filter) {
                 is StatusList -> {
-                    if (
-                        filter.state in
-                        filter.values.indices
-                    ) {
-                        filter.values[
-                            filter.state,
-                        ].key
-                            .takeIf { it.isNotBlank() }
-                            ?.let {
-                                builder.addQueryParameter(
-                                    "status",
-                                    it,
-                                )
-                            }
+                    if (filter.state in filter.values.indices) {
+                        filter.values[filter.state].key.takeIf { it.isNotBlank() }
+                            ?.let { builder.addQueryParameter("status", it) }
                     }
                 }
-
                 is CategoryNames -> {
-                    if (
-                        filter.state in
-                        filter.values.indices
-                    ) {
-                        filter.values[
-                            filter.state,
-                        ].key
-                            .takeIf { it.isNotBlank() }
-                            ?.let {
-                                builder.addQueryParameter(
-                                    "type",
-                                    it,
-                                )
-                            }
+                    if (filter.state in filter.values.indices) {
+                        filter.values[filter.state].key.takeIf { it.isNotBlank() }
+                            ?.let { builder.addQueryParameter("type", it) }
                     }
                 }
-
                 is OrderBy -> {
-                    if (
-                        filter.state in
-                        filter.values.indices
-                    ) {
-                        filter.values[
-                            filter.state,
-                        ].key
-                            .takeIf { it.isNotBlank() }
-                            ?.let {
-                                builder.addQueryParameter(
-                                    "sort",
-                                    it,
-                                )
-                            }
+                    if (filter.state in filter.values.indices) {
+                        filter.values[filter.state].key.takeIf { it.isNotBlank() }
+                            ?.let { builder.addQueryParameter("sort", it) }
                     }
                 }
-
                 is GenreList -> {
-                    val selected =
-                        filter.state.filter {
-                            it.state
-                        }
-
+                    val selected = filter.state.filter { it.state }
                     if (selected.isNotEmpty()) {
-                        builder.addEncodedQueryParameter(
-                            "genre",
-                            selected.joinToString(",") {
-                                it.id
-                                    .lowercase()
-                                    .replace(" ", "-")
-                            },
-                        )
+                        builder.addEncodedQueryParameter("genre", selected.joinToString(",") { it.id.lowercase().replace(" ", "-") })
                     }
                 }
-
-                else -> Unit
+                else -> {}
             }
         }
 
-        return GET(
-            builder.build(),
-            headers,
-        )
+        return GET(builder.build(), headers)
     }
 
     // ============================================================
@@ -283,53 +149,27 @@ abstract class Doujindesu : HttpSource() {
     // ============================================================
 
     /**
-     * Mengambil genre yang dikirim pada request.
-     *
-     * Contoh:
-     * genre=yuri,maid
-     *
-     * menjadi:
-     * ["yuri", "maid"]
+     * Mengambil genre yang dikirim pada request (genre=yuri,maid -> ["yuri", "maid"]).
      */
-    private fun selectedGenresFromRequest(
-        response: Response,
-    ): Set<String> = response.request.url
-        .queryParameter("genre")
-        ?.split(",")
-        ?.map {
-            it.trim().lowercase()
-        }
-        ?.filter {
-            it.isNotBlank()
-        }
-        ?.toSet()
-        ?: emptySet()
+    private fun selectedGenresFromRequest(response: Response): Set<String> {
+        return response.request.url.queryParameter("genre")
+            ?.split(",")
+            ?.map { it.trim().lowercase() }
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?: emptySet()
+    }
 
     /**
-     * Mengambil value property dari object menggunakan getter.
-     *
-     * Ini dipakai supaya kode ini tidak bergantung pada nama
-     * property Kotlin tertentu di MangaItem.
+     * Mengambil value property dari object menggunakan getter, supaya tidak bergantung
+     * pada nama property Kotlin tertentu di MangaItem.
      */
-    private fun getProperty(
-        instance: Any?,
-        propertyName: String,
-    ): Any? {
+    private fun getProperty(instance: Any?, propertyName: String): Any? {
         if (instance == null) return null
-
-        val expectedGetter =
-            "get" +
-                propertyName
-                    .replaceFirstChar {
-                        it.uppercase()
-                    }
-
-        val method =
-            instance.javaClass.methods.firstOrNull {
-                it.name == expectedGetter &&
-                    it.parameterTypes.isEmpty()
-            }
-
+        val expectedGetter = "get" + propertyName.replaceFirstChar { it.uppercase() }
+        val method = instance.javaClass.methods.firstOrNull {
+            it.name == expectedGetter && it.parameterTypes.isEmpty()
+        }
         return try {
             method?.invoke(instance)
         } catch (_: Exception) {
@@ -338,321 +178,110 @@ abstract class Doujindesu : HttpSource() {
     }
 
     /**
-     * Mengambil slug genre dari sebuah MangaItem.
-     *
-     * Struktur response yang kita temukan:
-     *
-     * manga_genres
-     *     -> genres
-     *         -> slug
-     *
-     * DTO Kotlin dapat memakai nama property camelCase,
-     * sehingga kita membaca melalui getter.
+     * Mengambil slug genre dari sebuah MangaItem (manga_genres -> genres -> slug).
      */
-    private fun mangaGenreSlugs(
-        manga: MangaItem,
-    ): Set<String> {
-        val mangaGenres =
-            getProperty(
-                manga,
-                "mangaGenres",
-            )
-
-        if (mangaGenres !is Iterable<*>) {
-            return emptySet()
-        }
+    private fun mangaGenreSlugs(manga: MangaItem): Set<String> {
+        val mangaGenres = getProperty(manga, "mangaGenres")
+        if (mangaGenres !is Iterable<*>) return emptySet()
 
         return buildSet {
             mangaGenres.forEach { mangaGenre ->
-
-                if (mangaGenre == null) {
-                    return@forEach
-                }
-
-                val genre =
-                    getProperty(
-                        mangaGenre,
-                        "genres",
-                    )
-
-                val slug =
-                    getProperty(
-                        genre,
-                        "slug",
-                    )
-                        ?.toString()
-                        ?.trim()
-                        ?.lowercase()
-
-                if (!slug.isNullOrBlank()) {
-                    add(slug)
-                }
+                if (mangaGenre == null) return@forEach
+                val genre = getProperty(mangaGenre, "genres")
+                val slug = getProperty(genre, "slug")?.toString()?.trim()?.lowercase()
+                if (!slug.isNullOrBlank()) add(slug)
             }
         }
     }
 
     /**
-     * Server melakukan OR ketika genre dikirim:
-     *
-     * genre=yuri,maid
-     *
-     * Di sini kita ubah hasilnya menjadi AND:
-     *
-     * manga harus memiliki SEMUA genre yang dipilih.
+     * Server melakukan OR ketika genre dikirim (genre=yuri,maid).
+     * Di sini kita ubah hasilnya menjadi AND: manga harus memiliki SEMUA genre yang dipilih.
      */
-    private fun filterMangasByGenres(
-        mangas: List<MangaItem>,
-        selectedGenres: Set<String>,
-    ): List<MangaItem> {
-        if (selectedGenres.isEmpty()) {
-            return mangas
-        }
+    private fun filterMangasByGenres(mangas: List<MangaItem>, selectedGenres: Set<String>): List<MangaItem> {
+        if (selectedGenres.isEmpty()) return mangas
 
         return mangas.filter { manga ->
-
-            val mangaGenres =
-                mangaGenreSlugs(manga)
-
-            selectedGenres.all {
-                it in mangaGenres
-            }
+            val mangaGenres = mangaGenreSlugs(manga)
+            selectedGenres.all { it in mangaGenres }
         }
     }
 
-    // ============================================================
-    // SEARCH PARSER
-    // ============================================================
-
-    override fun searchMangaParse(
-        response: Response,
-    ): MangasPage {
-        val url =
-            response.request.url
+    override fun searchMangaParse(response: Response): MangasPage {
+        val url = response.request.url
 
         var hasNextPage = false
 
-        val mangas =
-            if (
-                url.pathSegments.contains("manga")
-            ) {
-                val total =
-                    response.headers[
-                        "x-total-count",
-                    ]?.toIntOrNull()
+        val mangas = if (url.pathSegments.contains("manga")) {
+            val total = response.headers["x-total-count"]?.toIntOrNull()
+            val currentPage = url.fragment?.toIntOrNull() ?: 1
 
-                val currentPage =
-                    url.fragment
-                        ?.toIntOrNull()
-                        ?: 1
+            val rawMangas = response.parseAs<List<MangaItem>>()
+            val selectedGenres = selectedGenresFromRequest(response)
+            val filteredMangas = filterMangasByGenres(rawMangas, selectedGenres)
 
-                // Parse response terlebih dahulu.
-                val rawMangas =
-                    response.parseAs<List<MangaItem>>()
+            // Pagination masih menggunakan total dari server.
+            hasNextPage = total?.let { currentPage * LIMIT < it } ?: true
 
-                // Genre yang dikirim ke server.
-                val selectedGenres =
-                    selectedGenresFromRequest(
-                        response,
-                    )
-
-                // Server = OR
-                // Client = AND
-                val filteredMangas =
-                    filterMangasByGenres(
-                        rawMangas,
-                        selectedGenres,
-                    )
-
-                /*
-                 * Pagination masih menggunakan total dari server.
-                 *
-                 * Ini sengaja dipertahankan dahulu agar perubahan
-                 * hanya menyentuh sistem filter.
-                 */
-                hasNextPage =
-                    total?.let {
-                        currentPage * LIMIT < it
-                    } ?: true
-
-                filteredMangas
-            } else {
-                val taxonomyDto =
-                    response.parseAs<TaxonomyMangas>()
-
-                hasNextPage =
-                    taxonomyDto.pagination.page <
-                    taxonomyDto.pagination.totalPages
-
-                taxonomyDto.mangaList
-            }
-
-        return MangasPage(
-            mangas.map {
-                it.toSManga(baseUrl)
-            },
-            hasNextPage,
-        )
+            filteredMangas
+        } else {
+            val taxonomyDto = response.parseAs<TaxonomyMangas>()
+            hasNextPage = taxonomyDto.pagination.page < taxonomyDto.pagination.totalPages
+            taxonomyDto.mangaList
+        }
+        return MangasPage(mangas.map { it.toSManga(baseUrl) }, hasNextPage)
     }
 
-    // ============================================================
-    // MANGA DETAILS
-    // ============================================================
+    override fun getMangaUrl(manga: SManga) = "$baseUrl/manga/${manga.getSlug()}"
 
-    override fun getMangaUrl(
-        manga: SManga,
-    ) = "$baseUrl/manga/${manga.getSlug()}"
-
-    override fun mangaDetailsRequest(
-        manga: SManga,
-    ): Request {
-        val slug =
-            manga.getSlug()
-
-        return GET(
-            "$apiUrl/manga/$slug",
-            headers,
-        )
+    override fun mangaDetailsRequest(manga: SManga): Request {
+        val slug = manga.getSlug()
+        return GET("$apiUrl/manga/$slug", headers)
     }
 
-    override fun mangaDetailsParse(
-        response: Response,
-    ): SManga = response
-        .parseAs<MangaItem>()
-        .toSManga(baseUrl)
+    override fun mangaDetailsParse(response: Response): SManga = response.parseAs<MangaItem>().toSManga(baseUrl)
 
-    // ============================================================
-    // CHAPTERS
-    // ============================================================
+    override fun getChapterUrl(chapter: SChapter): String = "$baseUrl/reader/${chapter.url}"
 
-    override fun getChapterUrl(
-        chapter: SChapter,
-    ): String = "$baseUrl/reader/${chapter.url}"
+    override fun chapterListRequest(manga: SManga) = mangaDetailsRequest(manga)
 
-    override fun chapterListRequest(
-        manga: SManga,
-    ) = mangaDetailsRequest(manga)
-
-    override fun chapterListParse(
-        response: Response,
-    ): List<SChapter> {
-        val mangaItem =
-            response.parseAs<MangaItem>()
-
-        val chapters =
-            mangaItem.chapters
+    override fun chapterListParse(response: Response): List<SChapter> {
+        val mangaItem = response.parseAs<MangaItem>()
+        val chapters = mangaItem.chapters
 
         return chapters.mapIndexed { index, chapter ->
-            chapter.toSChapter(
-                isLast =
-                mangaItem.isCompleted() &&
-                    index == 0,
-            )
+            chapter.toSChapter(isLast = mangaItem.isCompleted() && index == 0)
         }
     }
 
-    // ============================================================
-    // PAGES
-    // ============================================================
+    override fun pageListRequest(chapter: SChapter): Request = GET("$apiUrl/chapters/${chapter.url}", headers)
 
-    override fun pageListRequest(
-        chapter: SChapter,
-    ): Request = GET(
-        "$apiUrl/chapters/${chapter.url}",
-        headers,
-    )
+    override fun pageListParse(response: Response): List<Page> = response.parseAs<PageList>().pages.mapIndexed { i, imgUrl ->
+        Page(i, imageUrl = Parser.unescapeEntities(imgUrl, false))
+    }
 
-    override fun pageListParse(
-        response: Response,
-    ): List<Page> = response
-        .parseAs<PageList>()
-        .pages
-        .mapIndexed { i, imgUrl ->
-            Page(
-                i,
-                imageUrl =
-                Parser.unescapeEntities(
-                    imgUrl,
-                    false,
-                ),
-            )
-        }
-
-    override fun imageUrlParse(
-        response: Response,
-    ): String = throw UnsupportedOperationException()
-
-    // ============================================================
-    // FILTERS
-    // ============================================================
+    override fun imageUrlParse(response: Response): String = throw UnsupportedOperationException()
 
     override fun getFilterList() = FilterList(
-        Filter.Header(
-            "Filter Tipe Diabaikan Saat Menggunakan Pencarian",
-        ),
-
-        AuthorGroupSeriesFilter(
-            authorGroupSeriesOptions,
-        ),
-
+        Filter.Header("Filter Tipe Diabaikan Saat Menggunakan Pencarian"),
+        AuthorGroupSeriesFilter(authorGroupSeriesOptions),
         AuthorGroupSeriesValueFilter(),
-
         Filter.Separator(),
-
-        StatusList(
-            statusList,
-        ),
-
-        CategoryNames(
-            categoryNames,
-        ),
-
-        OrderBy(
-            orderBy,
-        ),
-
-        GenreList(
-            getGenreList(),
-        ),
+        StatusList(statusList),
+        CategoryNames(categoryNames),
+        OrderBy(orderBy),
+        GenreList(getGenreList()),
     )
 
-    // ============================================================
-    // SLUG
-    // ============================================================
-
     fun SManga.getSlug(): String {
-        val fullUrl =
-            if (url.startsWith("http")) {
-                url
-            } else {
-                "$baseUrl/${url.removePrefix("/")}"
-            }
-
-        return fullUrl
-            .toHttpUrl()
-            .pathSegments
-            .last {
-                it.isNotBlank()
-            }
+        val fullUrl = if (url.startsWith("http")) url else "$baseUrl/${url.removePrefix("/")}"
+        return fullUrl.toHttpUrl().pathSegments.last { it.isNotBlank() }
     }
 
-    // ============================================================
-    // CONSTANTS
-    // ============================================================
-
     companion object {
-
-        private const val APP_SECRET =
-            "dfdf72051dbfdc7d76889ebd31324e74"
-
+        private const val APP_SECRET = "dfdf72051dbfdc7d76889ebd31324e74"
         private const val LIMIT = 24
 
-        private val imageDomains =
-            listOf(
-                "desu.photos",
-                "cdn-static.desu.xxx",
-                "desu.pics",
-                "uploads",
-                "upload",
-            )
+        private val imageDomains = listOf("desu.photos", "cdn-static.desu.xxx", "desu.pics", "uploads", "upload")
     }
 }
