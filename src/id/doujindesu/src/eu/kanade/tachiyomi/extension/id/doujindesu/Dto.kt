@@ -53,6 +53,26 @@ class MangaItem(
 ) {
     fun isCompleted(): Boolean = status.lowercase() in listOf("completed", "finished")
 
+    /**
+     * Slug genre dari manga ini (dipakai untuk client-side AND filter di Doujindesu.kt).
+     * Diambil langsung dari termList, dinormalisasi dengan format yang sama seperti
+     * genre id yang dikirim ke server (lowercase, spasi -> "-").
+     */
+    fun genreSlugs(): Set<String> {
+        return termList
+            ?.split("|")
+            ?.mapNotNull {
+                val parts = it.split(":")
+                if (parts.size == 3 && parts[1] == "genre") {
+                    parts[0].trim().lowercase().replace(" ", "-")
+                } else {
+                    null
+                }
+            }
+            ?.toSet()
+            ?: emptySet()
+    }
+
     fun List<String>?.orUnknown(): String = this
         ?.map { it.trim() }
         ?.filter { it.isNotEmpty() && !it.equals("N/A", true) }
