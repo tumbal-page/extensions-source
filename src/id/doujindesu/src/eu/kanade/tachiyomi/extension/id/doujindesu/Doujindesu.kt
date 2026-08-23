@@ -59,22 +59,17 @@ abstract class Doujindesu : HttpSource() {
             .build()
     }
 
-    override fun headersBuilder(): Headers.Builder =
-        super.headersBuilder()
-            .add("x-app-secret", APP_SECRET)
-            .add("Referer", "$baseUrl/")
+    override fun headersBuilder(): Headers.Builder = super.headersBuilder()
+        .add("x-app-secret", APP_SECRET)
+        .add("Referer", "$baseUrl/")
 
-    override fun popularMangaRequest(page: Int): Request =
-        searchRequest(page, "rating")
+    override fun popularMangaRequest(page: Int): Request = searchRequest(page, "rating")
 
-    override fun popularMangaParse(response: Response): MangasPage =
-        searchMangaParse(response)
+    override fun popularMangaParse(response: Response): MangasPage = searchMangaParse(response)
 
-    override fun latestUpdatesRequest(page: Int): Request =
-        searchRequest(page)
+    override fun latestUpdatesRequest(page: Int): Request = searchRequest(page)
 
-    override fun latestUpdatesParse(response: Response): MangasPage =
-        searchMangaParse(response)
+    override fun latestUpdatesParse(response: Response): MangasPage = searchMangaParse(response)
 
     private fun searchRequest(
         page: Int,
@@ -201,14 +196,13 @@ abstract class Doujindesu : HttpSource() {
 
         filters.forEach { filter ->
             when (filter) {
-
                 is StatusList -> {
                     if (
                         filter.state in
                         filter.values.indices
                     ) {
                         filter.values[
-                            filter.state
+                            filter.state,
                         ].key
                             .takeIf { it.isNotBlank() }
                             ?.let {
@@ -226,7 +220,7 @@ abstract class Doujindesu : HttpSource() {
                         filter.values.indices
                     ) {
                         filter.values[
-                            filter.state
+                            filter.state,
                         ].key
                             .takeIf { it.isNotBlank() }
                             ?.let {
@@ -244,7 +238,7 @@ abstract class Doujindesu : HttpSource() {
                         filter.values.indices
                     ) {
                         filter.values[
-                            filter.state
+                            filter.state,
                         ].key
                             .takeIf { it.isNotBlank() }
                             ?.let {
@@ -299,19 +293,17 @@ abstract class Doujindesu : HttpSource() {
      */
     private fun selectedGenresFromRequest(
         response: Response,
-    ): Set<String> {
-        return response.request.url
-            .queryParameter("genre")
-            ?.split(",")
-            ?.map {
-                it.trim().lowercase()
-            }
-            ?.filter {
-                it.isNotBlank()
-            }
-            ?.toSet()
-            ?: emptySet()
-    }
+    ): Set<String> = response.request.url
+        .queryParameter("genre")
+        ?.split(",")
+        ?.map {
+            it.trim().lowercase()
+        }
+        ?.filter {
+            it.isNotBlank()
+        }
+        ?.toSet()
+        ?: emptySet()
 
     /**
      * Mengambil value property dari object menggunakan getter.
@@ -360,7 +352,6 @@ abstract class Doujindesu : HttpSource() {
     private fun mangaGenreSlugs(
         manga: MangaItem,
     ): Set<String> {
-
         val mangaGenres =
             getProperty(
                 manga,
@@ -372,7 +363,6 @@ abstract class Doujindesu : HttpSource() {
         }
 
         return buildSet {
-
             mangaGenres.forEach { mangaGenre ->
 
                 if (mangaGenre == null) {
@@ -414,7 +404,6 @@ abstract class Doujindesu : HttpSource() {
         mangas: List<MangaItem>,
         selectedGenres: Set<String>,
     ): List<MangaItem> {
-
         if (selectedGenres.isEmpty()) {
             return mangas
         }
@@ -437,7 +426,6 @@ abstract class Doujindesu : HttpSource() {
     override fun searchMangaParse(
         response: Response,
     ): MangasPage {
-
         val url =
             response.request.url
 
@@ -447,10 +435,9 @@ abstract class Doujindesu : HttpSource() {
             if (
                 url.pathSegments.contains("manga")
             ) {
-
                 val total =
                     response.headers[
-                        "x-total-count"
+                        "x-total-count",
                     ]?.toIntOrNull()
 
                 val currentPage =
@@ -488,15 +475,13 @@ abstract class Doujindesu : HttpSource() {
                     } ?: true
 
                 filteredMangas
-
             } else {
-
                 val taxonomyDto =
                     response.parseAs<TaxonomyMangas>()
 
                 hasNextPage =
                     taxonomyDto.pagination.page <
-                        taxonomyDto.pagination.totalPages
+                    taxonomyDto.pagination.totalPages
 
                 taxonomyDto.mangaList
             }
@@ -515,8 +500,7 @@ abstract class Doujindesu : HttpSource() {
 
     override fun getMangaUrl(
         manga: SManga,
-    ) =
-        "$baseUrl/manga/${manga.getSlug()}"
+    ) = "$baseUrl/manga/${manga.getSlug()}"
 
     override fun mangaDetailsRequest(
         manga: SManga,
@@ -532,10 +516,9 @@ abstract class Doujindesu : HttpSource() {
 
     override fun mangaDetailsParse(
         response: Response,
-    ): SManga =
-        response
-            .parseAs<MangaItem>()
-            .toSManga(baseUrl)
+    ): SManga = response
+        .parseAs<MangaItem>()
+        .toSManga(baseUrl)
 
     // ============================================================
     // CHAPTERS
@@ -543,18 +526,15 @@ abstract class Doujindesu : HttpSource() {
 
     override fun getChapterUrl(
         chapter: SChapter,
-    ): String =
-        "$baseUrl/reader/${chapter.url}"
+    ): String = "$baseUrl/reader/${chapter.url}"
 
     override fun chapterListRequest(
         manga: SManga,
-    ) =
-        mangaDetailsRequest(manga)
+    ) = mangaDetailsRequest(manga)
 
     override fun chapterListParse(
         response: Response,
     ): List<SChapter> {
-
         val mangaItem =
             response.parseAs<MangaItem>()
 
@@ -564,8 +544,8 @@ abstract class Doujindesu : HttpSource() {
         return chapters.mapIndexed { index, chapter ->
             chapter.toSChapter(
                 isLast =
-                    mangaItem.isCompleted() &&
-                        index == 0,
+                mangaItem.isCompleted() &&
+                    index == 0,
             )
         }
     }
@@ -576,75 +556,70 @@ abstract class Doujindesu : HttpSource() {
 
     override fun pageListRequest(
         chapter: SChapter,
-    ): Request =
-        GET(
-            "$apiUrl/chapters/${chapter.url}",
-            headers,
-        )
+    ): Request = GET(
+        "$apiUrl/chapters/${chapter.url}",
+        headers,
+    )
 
     override fun pageListParse(
         response: Response,
-    ): List<Page> =
-        response
-            .parseAs<PageList>()
-            .pages
-            .mapIndexed { i, imgUrl ->
-                Page(
-                    i,
-                    imageUrl =
-                        Parser.unescapeEntities(
-                            imgUrl,
-                            false,
-                        ),
-                )
-            }
+    ): List<Page> = response
+        .parseAs<PageList>()
+        .pages
+        .mapIndexed { i, imgUrl ->
+            Page(
+                i,
+                imageUrl =
+                Parser.unescapeEntities(
+                    imgUrl,
+                    false,
+                ),
+            )
+        }
 
     override fun imageUrlParse(
         response: Response,
-    ): String =
-        throw UnsupportedOperationException()
+    ): String = throw UnsupportedOperationException()
 
     // ============================================================
     // FILTERS
     // ============================================================
 
-    override fun getFilterList() =
-        FilterList(
-            Filter.Header(
-                "Filter Tipe Diabaikan Saat Menggunakan Pencarian",
-            ),
+    override fun getFilterList() = FilterList(
+        Filter.Header(
+            "Filter Tipe Diabaikan Saat Menggunakan Pencarian",
+        ),
 
-            AuthorGroupSeriesFilter(
-                authorGroupSeriesOptions,
-            ),
+        AuthorGroupSeriesFilter(
+            authorGroupSeriesOptions,
+        ),
 
-            AuthorGroupSeriesValueFilter(),
+        AuthorGroupSeriesValueFilter(),
 
-            Filter.Separator(),
+        Filter.Separator(),
 
-            StatusList(
-                statusList,
-            ),
+        StatusList(
+            statusList,
+        ),
 
-            CategoryNames(
-                categoryNames,
-            ),
+        CategoryNames(
+            categoryNames,
+        ),
 
-            OrderBy(
-                orderBy,
-            ),
+        OrderBy(
+            orderBy,
+        ),
 
-            GenreList(
-                getGenreList(),
-            ),
-        )
+        GenreList(
+            getGenreList(),
+        ),
+    )
 
     // ============================================================
     // SLUG
     // ============================================================
 
     fun SManga.getSlug(): String {
-
         val fullUrl =
             if (url.startsWith("http")) {
                 url
