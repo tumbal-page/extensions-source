@@ -50,26 +50,9 @@ class MangaItem(
     @SerialName("alt_titles") private val altTitles: String?,
     @SerialName("term_list") private val termList: String? = null,
     @SerialName("cover_url") private val coverUrl: String,
+    @SerialName("manga_genres") val mangaGenres: List<MangaGenreItem> = emptyList(),
 ) {
     fun isCompleted(): Boolean = status.lowercase() in listOf("completed", "finished")
-
-    /**
-     * Slug genre dari manga ini (dipakai untuk client-side AND filter di Doujindesu.kt).
-     * Diambil langsung dari termList, dinormalisasi dengan format yang sama seperti
-     * genre id yang dikirim ke server (lowercase, spasi -> "-").
-     */
-    fun genreSlugs(): Set<String> = termList
-        ?.split("|")
-        ?.mapNotNull {
-            val parts = it.split(":")
-            if (parts.size == 3 && parts[1] == "genre") {
-                parts[0].trim().lowercase().replace(" ", "-")
-            } else {
-                null
-            }
-        }
-        ?.toSet()
-        ?: emptySet()
 
     fun List<String>?.orUnknown(): String = this
         ?.map { it.trim() }
@@ -247,6 +230,16 @@ class PageList(
             }
         }
 }
+
+@Serializable
+class MangaGenreItem(
+    val genres: MangaGenreSlug,
+)
+
+@Serializable
+class MangaGenreSlug(
+    val slug: String,
+)
 
 @Serializable
 class EncryptedDto(
