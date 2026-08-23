@@ -8,7 +8,8 @@ on:
     paths:
       - 'src/id/doujindesu/**'
 
-permissions: {}
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -27,6 +28,15 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Auto-format (Spotless)
+        run: ./gradlew :src:id:doujindesu:spotlessApply
+
+      - name: Commit formatting fixes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: auto-format via spotless"
+          file_pattern: 'src/id/doujindesu/**'
 
       # Debug build: tidak butuh signing key sama sekali,
       # cocok buat testing/pemakaian pribadi.
